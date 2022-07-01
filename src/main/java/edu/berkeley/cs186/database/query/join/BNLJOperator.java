@@ -88,6 +88,9 @@ public class BNLJOperator extends JoinOperator {
          */
         private void fetchNextLeftBlock() {
             // TODO(proj3_part1): implement
+            leftBlockIterator=getBlockIterator(leftSourceIterator,getLeftSource().getSchema(),numBuffers-2);
+            leftRecord=leftBlockIterator.next();
+            leftBlockIterator.markPrev();
         }
 
         /**
@@ -103,6 +106,8 @@ public class BNLJOperator extends JoinOperator {
          */
         private void fetchNextRightPage() {
             // TODO(proj3_part1): implement
+            rightPageIterator=getBlockIterator(rightSourceIterator,getRightSource().getSchema(),1);
+            rightPageIterator.markNext();
         }
 
         /**
@@ -115,7 +120,31 @@ public class BNLJOperator extends JoinOperator {
          */
         private Record fetchNextRecord() {
             // TODO(proj3_part1): implement
-            return null;
+            if(leftRecord==null) return null;
+            //five cases
+            while(true){
+                if(this.rightPageIterator.hasNext()){
+                    Record rightRecord=rightPageIterator.next();
+                    if(compare(leftRecord,rightRecord)==0) return leftRecord.concat(rightRecord);
+                }
+                else if(this.leftBlockIterator.hasNext()){
+                    this.leftRecord=this.leftBlockIterator.next();
+                    this.rightPageIterator.reset();
+                    //I guess the markPrev() or markNext() still store marks, so don't need to reset marks
+                }
+                else if(rightSourceIterator.hasNext()){
+                    fetchNextRightPage();
+                    leftBlockIterator.reset();
+                    //also needs to reset leftRecord
+                    leftRecord=leftBlockIterator.next();
+                }
+                else if(leftSourceIterator.hasNext()){
+                    fetchNextLeftBlock();
+                    rightSourceIterator.reset();
+                    fetchNextRightPage();
+                }
+                else return null;
+            }
         }
 
         /**

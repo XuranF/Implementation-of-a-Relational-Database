@@ -27,6 +27,7 @@ import edu.berkeley.cs186.database.recovery.DummyRecoveryManager;
 import edu.berkeley.cs186.database.recovery.RecoveryManager;
 import edu.berkeley.cs186.database.table.*;
 import edu.berkeley.cs186.database.table.stats.TableStats;
+import edu.berkeley.cs186.database.table.Record;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -931,7 +932,15 @@ public class Database implements AutoCloseable {
         public void close() {
             try {
                 // TODO(proj4_part2)
-                return;
+                //bottom-up release, top-down acquire
+                TransactionContext transactionContext=TransactionContext.getTransaction();
+                List<Lock> lockList=lockManager.getLocks(transactionContext);
+
+                for(int i=lockList.size()-1;i>=0;i--){
+                    LockContext lockContext=LockContext.fromResourceName(lockManager,lockList.get(i).name);
+                    lockContext.release(transactionContext);
+                }
+
             } catch (Exception e) {
                 // There's a chance an error message from your release phase
                 // logic can get suppressed. This guarantees that the stack

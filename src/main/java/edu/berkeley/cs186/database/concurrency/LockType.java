@@ -11,6 +11,24 @@ public enum LockType {
     SIX, // shared intention exclusive
     NL;  // no lock held
 
+    final static boolean[][] compatibilityMatrix={{true,true,true,true,true,true},//Nl
+                                            {true,true,true,true,true,false},//IS
+                                            {true,true,true,false,false,false},//IX
+                                            {true,true,false,true,false,false},//S
+                                            {true,true,false,false,false,false},//SIX
+                                            {true,false,false,false,false,false}};//X
+    final static boolean[][] parentMatrix={{true,false,false,false,false,false},
+                                     {true,true,false,true,false,false},
+                                     {true,true,true,true,true,true},
+                                     {true,false,false,false,false,false},
+                                     {true,false,true,false,true,true},
+                                     {true,false,false,false,false,false}};
+    final static boolean[][] substituteMatrix={{true,false,false,false,false,false},
+                                         {true,true,false,false,false,false},
+                                         {true,true,true,false,false,false},
+                                         {true,true,false,true,false,false},
+                                         {true,true,true,true,true,false},
+                                         {true,true,true,true,true,true}};
     /**
      * This method checks whether lock types A and B are compatible with
      * each other. If a transaction can hold lock type A on a resource
@@ -22,8 +40,18 @@ public enum LockType {
             throw new NullPointerException("null lock type");
         }
         // TODO(proj4_part1): implement
-
-        return false;
+        return compatibilityMatrix[matrixIndex(a)][matrixIndex(b)];
+    }
+    private static int matrixIndex(LockType l){
+        switch (l){
+            case S: return 3;
+            case X: return 5;
+            case IS: return 1;
+            case IX: return 2;
+            case SIX: return 4;
+            case NL: return 0;
+            default: throw new UnsupportedOperationException("bad lock type");
+        }
     }
 
     /**
@@ -54,8 +82,7 @@ public enum LockType {
             throw new NullPointerException("null lock type");
         }
         // TODO(proj4_part1): implement
-
-        return false;
+        return parentMatrix[matrixIndex(parentLockType)][matrixIndex(childLockType)];
     }
 
     /**
@@ -69,8 +96,7 @@ public enum LockType {
             throw new NullPointerException("null lock type");
         }
         // TODO(proj4_part1): implement
-
-        return false;
+        return substituteMatrix[matrixIndex(substitute)][matrixIndex(required)];
     }
 
     /**

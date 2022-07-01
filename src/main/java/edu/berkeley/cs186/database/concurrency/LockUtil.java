@@ -1,6 +1,7 @@
 package edu.berkeley.cs186.database.concurrency;
 
 import edu.berkeley.cs186.database.TransactionContext;
+import edu.berkeley.cs186.database.query.join.BNLJOperator;
 
 /**
  * LockUtil is a declarative layer which simplifies multigranularity lock
@@ -42,8 +43,38 @@ public class LockUtil {
         LockType explicitLockType = lockContext.getExplicitLockType(transaction);
 
         // TODO(proj4_part2): implement
-        return;
+        if(LockType.substitutable(effectiveLockType,requestType)||requestType.equals(LockType.NL)) return;
+        if(requestType.equals(LockType.S)){
+            ensureAncestor(transaction,lockContext,LockType.IS,true);
+            if(effectiveLockType.equals(LockType.IX)) lockContext.promote(transaction,LockType.SIX);
+            else if(effectiveLockType.equals(LockType.IS)) lockContext.escalate(transaction);
+            else lockContext.acquire(transaction,LockType.S); //NL
+        }
+        else{
+            ensureAncestor(transaction,lockContext,LockType.IX,false);
+            if(effectiveLockType.equals(LockType.NL)) lockContext.acquire(transaction,LockType.X);
+            else if(effectiveLockType.equals(LockType.S)) lockContext.promote(transaction,LockType.X);
+            else if(effectiveLockType.equals(LockType.IS)) {
+                lockContext.escalate(transaction);
+                lockContext.promote(transaction,LockType.X);
+            }
+            else lockContext.escalate(transaction);
+        }
     }
 
     // TODO(proj4_part2) add any helper methods you want
+    private static void ensureAncestor(TransactionContext transaction, LockContext lockContext, LockType lockType, Boolean isS){
+        LockContext parentContext = lockContext.parentContext();
+        if(parentContext==null) return;
+        ensureAncestor(transaction,parentContext,lockType,isS);
+        if(isS&&parentContext.getEffectiveLockType(transaction).equals(LockType.NL)) parentContext.acquire(transaction,lockType);
+        else if(!isS){
+            if(parentContext.getEffectiveLockType(transaction).equals(LockType.NL))
+                parentContext.acquire(transaction,lockType);
+            else if(parentContext.getEffectiveLockType(transaction).equals(LockType.IS))
+                parentContext.promote(transaction,lockType);
+            else if(parentContext.getEffectiveLockType(transaction).equals(LockType.S))
+                parentContext.promote(transaction,LockType.SIX);
+        }
+    }
 }

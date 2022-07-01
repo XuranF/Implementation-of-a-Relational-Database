@@ -81,8 +81,12 @@ class InnerNode extends BPlusNode {
     @Override
     public LeafNode get(DataBox key) {
         // TODO(proj2): implement
-
-        return null;
+        int candidateChildIndex = numLessThanEqual(key,keys);
+        Long innerNodePointer=children.get(candidateChildIndex);
+        //pay attention that inner node pointer is also pointing to a page(which confuses me a lot), and we need to load next candidate node from this page
+        //need to call parent class(BPlusNode) .fromBytes method because candidate node could be a leaf node(target);
+        BPlusNode nextNode=BPlusNode.fromBytes(metadata, bufferManager,treeContext,innerNodePointer);
+        return nextNode.get(key);
     }
 
     // See BPlusNode.getLeftmostLeaf.
@@ -90,32 +94,87 @@ class InnerNode extends BPlusNode {
     public LeafNode getLeftmostLeaf() {
         assert(children.size() > 0);
         // TODO(proj2): implement
-
-        return null;
+        Long innerNodePointer=children.get(0);
+        //There is a helper function called 'getChild' to retrieve nextNode, but I choose not to use it.
+        BPlusNode nextNode=BPlusNode.fromBytes(metadata, bufferManager,treeContext,innerNodePointer);
+        return nextNode.getLeftmostLeaf();
     }
 
     // See BPlusNode.put.
     @Override
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
         // TODO(proj2): implement
-
+        int candidateChildIndex = numLessThanEqual(key,keys);
+        Optional<Pair<DataBox,Long>> putResult=getChild(candidateChildIndex).put(key,rid);
+        //child node has split
+        if(putResult.isPresent()){
+            DataBox splitKey=putResult.get().getFirst();
+            Long newPointer=putResult.get().getSecond();
+            keys.add(candidateChildIndex,splitKey);
+            children.add(candidateChildIndex+1,newPointer);
+            int orderOfTree=this.metadata.getOrder();
+            int maxEntryNum=orderOfTree*2;
+            if(keys.size()<=maxEntryNum){
+                sync();
+                return Optional.empty();
+            }
+            List<DataBox> newKeys = new ArrayList<>();
+            List<Long> newChildren = new ArrayList<>();
+            for(int i=0;i<orderOfTree+1;i++){
+                newKeys.add(keys.remove(orderOfTree));
+                newChildren.add(children.remove(orderOfTree+1));
+            }
+            DataBox nextSplitKey=newKeys.remove(0);
+            InnerNode newNode=new InnerNode(metadata,bufferManager,newKeys,newChildren,treeContext);
+            Long nextNewPointer=newNode.getPage().getPageNum();
+            newNode.sync();
+            this.sync();
+            return Optional.of(new Pair<DataBox,Long>(nextSplitKey,nextNewPointer));
+        }
         return Optional.empty();
     }
 
     // See BPlusNode.bulkLoad.
+
     @Override
     public Optional<Pair<DataBox, Long>> bulkLoad(Iterator<Pair<DataBox, RecordId>> data,
             float fillFactor) {
         // TODO(proj2): implement
+        int order=this.metadata.getOrder();
+        int maxEntryNum=2*order;
+        //This part requires clear logic
+        while(data.hasNext()){
+                                                   //this is different from 'put', we always choose rightmost children as next candidate
+            Optional<Pair<DataBox,Long>> putResult=getChild(keys.size()).bulkLoad(data,fillFactor);
+            if(putResult.isPresent()){
+                DataBox splitKey=putResult.get().getFirst();
+                Long newPointer=putResult.get().getSecond();
+                keys.add(splitKey); children.add(newPointer);
+                if(keys.size()>maxEntryNum) break;
+            }
+        }
+        //while loop exit because we run out of iterator and no node needs to be split
+        if(keys.size()<=maxEntryNum){this.sync();return Optional.empty();}
 
-        return Optional.empty();
+        //while loop exit because we need to split node
+        List<DataBox> newKeys = new ArrayList<>();
+        List<Long> newChildren = new ArrayList<>();
+        for(int i=0;i<order+1;i++){
+            newKeys.add(keys.remove(order));
+            newChildren.add(children.remove(order+1));
+        }
+        InnerNode newNode=new InnerNode(metadata,bufferManager,newKeys,newChildren,treeContext);
+        Long nextNewPointer=newNode.getPage().getPageNum();
+        newNode.sync();
+        this.sync();
+        return Optional.of(new Pair<DataBox,Long>(newKeys.remove(0),nextNewPointer));
     }
 
     // See BPlusNode.remove.
     @Override
     public void remove(DataBox key) {
         // TODO(proj2): implement
-
+        getChild(numLessThanEqual(key,keys)).remove(key);
         return;
     }
 

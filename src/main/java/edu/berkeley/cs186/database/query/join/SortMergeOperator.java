@@ -140,6 +140,50 @@ public class SortMergeOperator extends JoinOperator {
          */
         private Record fetchNextRecord() {
             // TODO(proj3_part1): implement
+            //iterator的情况讨论起来很麻烦
+            //而且需要注意的是均以null返回输出值和赋值给没有next的record，不能遵循默认的只是throw exception
+            if(leftRecord==null || rightRecord==null&&!marked) return null;
+            if(rightRecord==null) {
+                if(leftIterator.hasNext()) leftRecord=leftIterator.next();
+                else return null;
+
+                rightIterator.reset();
+                rightRecord=rightIterator.next();
+                this.marked=false;
+            }
+
+            do{
+                if(!marked){
+                    while(compare(leftRecord,rightRecord)<0) {
+                        if(!leftIterator.hasNext()) return null;
+                        leftRecord=leftIterator.next();
+                    }
+                    while(compare(leftRecord,rightRecord)>0) {
+                        if(!rightIterator.hasNext()) return null;
+                        rightRecord=rightIterator.next();
+                    }
+                    rightIterator.markPrev();
+                    this.marked=true;
+                }
+                if(compare(leftRecord,rightRecord)==0){
+                    Record record = leftRecord.concat(rightRecord);
+
+                    if(rightIterator.hasNext()) rightRecord=rightIterator.next();
+                    else rightRecord=null;
+
+                    return record;
+                }
+                else {
+                    rightIterator.reset();
+                    rightRecord=rightIterator.next();
+
+                    if(leftIterator.hasNext()) leftRecord=leftIterator.next();
+                    else leftRecord=null;
+
+                    this.marked=false;
+                }
+            } while(leftRecord!=null);
+
             return null;
         }
 
