@@ -143,7 +143,7 @@ public class LockContext {
         if(readonly) throw new UnsupportedOperationException("The context is read-only!");
         LockType releaseType = lockman.getLockType(transaction,name);
         for(Lock lock: getDescendantContext(transaction)){
-            if(LockType.canBeParentLock(releaseType,lock.lockType))
+            if(LockType.canBeParentLock(releaseType,lock.lockType)&&releaseType.equals(LockType.parentLock(lock.lockType)))
                 throw new InvalidLockException("Cannot release lock due to the violation of multigranularity.");
         }
         lockman.release(transaction,name);

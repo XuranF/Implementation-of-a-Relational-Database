@@ -1,7 +1,6 @@
 package edu.berkeley.cs186.database.concurrency;
 
 import edu.berkeley.cs186.database.TransactionContext;
-import edu.berkeley.cs186.database.query.join.BNLJOperator;
 
 /**
  * LockUtil is a declarative layer which simplifies multigranularity lock
